@@ -61,7 +61,7 @@ impl Chip8 {
         self.memory[0x50..=0x09F].clone_from_slice(&font[..]);
     }
 
-    pub fn load_data(self: &mut Self, path: &'static str) -> Result<(), Box<dyn Error>> {
+    pub fn load_data(self: &mut Self, path: &str) -> Result<(), Box<dyn Error>> {
         let mem = std::fs::read(path)?;
         let mem_len = mem.len();
         self.memory[0x200..0x200+mem_len].clone_from_slice(&mem[..]);
