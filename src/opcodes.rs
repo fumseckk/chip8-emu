@@ -1,12 +1,13 @@
-use crate::{Chip8, Display};
-use termkan::{input::KeyEvent, rds::Renderer};
+use crate::{Chip8, InputHandler};
+use termkan::{input::KeyEvent};
 use rand::Rng;
+
 
 type N = u8;
 type NN = u8;
 type NNN = u16;
-type VX = usize;
-type VY = usize;
+type Vx = usize;
+type Vy = usize;
 
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -15,36 +16,36 @@ pub enum OpCode {
     Return(),
     Jump(NNN),
     CallSubroutine(NNN),
-    CondEq(VX, NN),
-    CondNEq(VX, NN),
-    CondEqReg(VX, VY),
-    SetReg(VX, NN),
-    AddToReg(VX, NN), // no change to carry
-    AssignRegToReg(VX, VY),
-    BitwiseOr(VX, VY),
-    BitwiseAnd(VX, VY),
-    BitwiseXor(VX, VY),
-    AddRegToReg(VX, VY), // with carry
-    SubRegToReg(VX, VY), // with carry
-    StoreLSBWithShift(VX),
-    SubRegFromReg(VX, VY), // with carry
-    StoreMSBWithShift(VX),
-    CondNEqReg(VX, VY),
+    CondEq(Vx, NN),
+    CondNEq(Vx, NN),
+    CondEqReg(Vx, Vy),
+    SetReg(Vx, NN),
+    AddToReg(Vx, NN), // no change to carry
+    AssignRegToReg(Vx, Vy),
+    BitwiseOr(Vx, Vy),
+    BitwiseAnd(Vx, Vy),
+    BitwiseXor(Vx, Vy),
+    AddRegToReg(Vx, Vy), // with carry
+    SubRegToReg(Vx, Vy), // with carry
+    StoreLSBWithShift(Vx),
+    SubRegFromReg(Vx, Vy), // with carry
+    StoreMSBWithShift(Vx),
+    CondNEqReg(Vx, Vy),
     SetI(NNN),
     JumpToV0Plus(NNN),
-    RegRandBitwiseAnd(VX, NN), // rand: from 0 to 255
-    DrawSprite(VX, VY, N), // with carry
-    IsKeyPressed(VX),
-    IsKeyNPressed(VX),
-    SetRegToTimer(VX),
-    AwaitKey(VX), // blocking op
-    SetDelayTimer(VX),
-    SetSoundTimer(VX),
-    AddRegToI(VX),
-    SetIToSprite(VX),
-    ToDecimal(VX),
-    DumpRegs(VX),
-    LoadRegs(VX),
+    RegRandBitwiseAnd(Vx, NN), // rand: from 0 to 255
+    DrawSprite(Vx, Vy, N), // with carry
+    IsKeyPressed(Vx),
+    IsKeyNPressed(Vx),
+    SetRegToTimer(Vx),
+    AwaitKey(Vx), // blocking op
+    SetDelayTimer(Vx),
+    SetSoundTimer(Vx),
+    AddRegToI(Vx),
+    SetIToSprite(Vx),
+    ToDecimal(Vx),
+    DumpRegs(Vx),
+    LoadRegs(Vx),
 }
 
 
@@ -124,11 +125,11 @@ impl Chip8 {
 
         self.pc += 2;
 
-        let X = Self::nth_nibble(1, opcode) as usize;
-        let Y = Self::nth_nibble(2, opcode) as usize;
-        let N = Self::nth_nibble(3, opcode) as u8;
-        let NN = Self::range_nibble(2, 4, opcode) as u8;
-        let NNN = Self::range_nibble(1, 4, opcode);
+        let x = Self::nth_nibble(1, opcode) as usize;
+        let y = Self::nth_nibble(2, opcode) as usize;
+        let n = Self::nth_nibble(3, opcode) as u8;
+        let nn = Self::range_nibble(2, 4, opcode) as u8;
+        let nnn = Self::range_nibble(1, 4, opcode);
 
         match Self::nth_nibble(0, opcode) {
             0x0 => {
@@ -138,59 +139,60 @@ impl Chip8 {
                     _      => None
                 }
             }
-            0x1 => Some(OpCode::Jump(NNN)), // 1NNN
-            0x2 => Some(OpCode::CallSubroutine(NNN)), // 2NNN
-            0x3 => Some(OpCode::CondEq(X, NN)), // 3XNN
-            0x4 => Some(OpCode::CondNEq(X, NN)), // 4XNN
+            0x1 => Some(OpCode::Jump(nnn)), // 1nnn
+            0x2 => Some(OpCode::CallSubroutine(nnn)), // 2nnn
+            0x3 => Some(OpCode::CondEq(x, nn)), // 3XNN
+            0x4 => Some(OpCode::CondNEq(x, nn)), // 4XNN
             0x5 => {
-                match N {
-                    0x0 => Some(OpCode::CondEqReg(X, Y)), // 5XY0
+                match n {
+                    0x0 => Some(OpCode::CondEqReg(x, y)), // 5XY0
                     _   => None
                 }
             }
-            0x6 => Some(OpCode::SetReg(X, NN)), // 6XNN
-            0x7 => Some(OpCode::AddToReg(X, NN)), // 7XNN
+            0x6 => Some(OpCode::SetReg(x, nn)), // 6XNN
+            0x7 => Some(OpCode::AddToReg(x, nn)), // 7XNN
             0x8 => {
-                match N {
-                    0 => Some(OpCode::AssignRegToReg(X, Y)), // 8XY0
-                    1 => Some(OpCode::BitwiseOr(X, Y)), // 8XY1
-                    2 => Some(OpCode::BitwiseAnd(X, Y)), // 8XY2
-                    3 => Some(OpCode::BitwiseXor(X, Y)), // 8XY3
-                    4 => Some(OpCode::AddRegToReg(X, Y)), // 8XY4
-                    5 => Some(OpCode::SubRegToReg(X, Y)), // 8XY5
-                    6 => Some(OpCode::StoreLSBWithShift(X)), // 8XY6
-                    7 => Some(OpCode::SubRegFromReg(X, Y)), // 8XY7
-                    E => Some(OpCode::StoreMSBWithShift(X)), // 8XYE
+                match n {
+                    0 => Some(OpCode::AssignRegToReg(x, y)), // 8XY0
+                    1 => Some(OpCode::BitwiseOr(x, y)), // 8XY1
+                    2 => Some(OpCode::BitwiseAnd(x, y)), // 8XY2
+                    3 => Some(OpCode::BitwiseXor(x, y)), // 8XY3
+                    4 => Some(OpCode::AddRegToReg(x, y)), // 8XY4
+                    5 => Some(OpCode::SubRegToReg(x, y)), // 8XY5
+                    6 => Some(OpCode::StoreLSBWithShift(x)), // 8XY6
+                    7 => Some(OpCode::SubRegFromReg(x, y)), // 8XY7
+                    0xE => Some(OpCode::StoreMSBWithShift(x)), // 8XYE
+                    _ => None
                 }
             }
             0x9 => {
-                match N {
-                    0x0 => Some(OpCode::CondNEqReg(X, Y)), // 9XY0
+                match n {
+                    0x0 => Some(OpCode::CondNEqReg(x, y)), // 9XY0
                     _   => None
                 }
             }
-            0xA => Some(OpCode::SetI(NNN)), // ANNN
-            0xB => Some(OpCode::JumpToV0Plus(NNN)), // BNNN
-            0xC => Some(OpCode::RegRandBitwiseAnd(X, NN)), // CXNN
-            0xD => Some(OpCode::DrawSprite(X, Y, N)), // DXYN
+            0xA => Some(OpCode::SetI(nnn)), // Annn
+            0xB => Some(OpCode::JumpToV0Plus(nnn)), // Bnnn
+            0xC => Some(OpCode::RegRandBitwiseAnd(x, nn)), // CXNN
+            0xD => Some(OpCode::DrawSprite(x, y, n)), // DXYN
             0xE => {
-                match NN {
-                    0x9E => Some(OpCode::IsKeyPressed(X)), // EX9E
-                    0xA1 => Some(OpCode::IsKeyNPressed(X)), // EXA1
+                match nn {
+                    0x9E => Some(OpCode::IsKeyPressed(x)), // EX9E
+                    0xA1 => Some(OpCode::IsKeyNPressed(x)), // EXA1
                     _    => None
                 }
             }
             0xF => {
-                match NN {
-                    0x07 => Some(OpCode::SetRegToTimer(X)), // FX07
-                    0x0A => Some(OpCode::AwaitKey(X)), // FX0A
-                    0x15 => Some(OpCode::SetDelayTimer(X)), // FX15
-                    0x18 => Some(OpCode::SetSoundTimer(X)), // FX18
-                    0x1E => Some(OpCode::AddRegToI(X)), // FX1E
-                    0x29 => Some(OpCode::SetIToSprite(X)), // FX29
-                    0x33 => Some(OpCode::ToDecimal(X)), // FX33
-                    0x55 => Some(OpCode::DumpRegs(X)), // FX55
-                    0x65 => Some(OpCode::LoadRegs(X)), // FX6E
+                match nn {
+                    0x07 => Some(OpCode::SetRegToTimer(x)), // FX07
+                    0x0A => Some(OpCode::AwaitKey(x)), // FX0A
+                    0x15 => Some(OpCode::SetDelayTimer(x)), // FX15
+                    0x18 => Some(OpCode::SetSoundTimer(x)), // FX18
+                    0x1E => Some(OpCode::AddRegToI(x)), // FX1E
+                    0x29 => Some(OpCode::SetIToSprite(x)), // FX29
+                    0x33 => Some(OpCode::ToDecimal(x)), // FX33
+                    0x55 => Some(OpCode::DumpRegs(x)), // FX55
+                    0x65 => Some(OpCode::LoadRegs(x)), // FX6E
                     _    => None
                 }
             }
@@ -199,7 +201,7 @@ impl Chip8 {
     }
 
 
-    pub fn execute_opcode(&mut self, opcode: OpCode, display: &Display) -> Result<(), &'static str>{
+    pub fn execute_opcode(&mut self, opcode: OpCode, input_handler: &InputHandler) -> Result<(), &'static str>{
         match opcode {
             OpCode::ClearScreen() => {
                 self.buf_clear_screen();
@@ -211,133 +213,133 @@ impl Chip8 {
                     None => return Err("Tried to return from subroutine with empty stack")
                 }
             }
-            OpCode::Jump(NNN) => {
-                self.pc = NNN
+            OpCode::Jump(nnn) => {
+                self.pc = nnn
             }
-            OpCode::CallSubroutine(NNN) => {
+            OpCode::CallSubroutine(nnn) => {
                 self.stack.push(self.pc);
-                self.pc = NNN;
+                self.pc = nnn;
             }
-            OpCode::CondEq(X, NN) => {
-                if self.V[X] == NN {
+            OpCode::CondEq(x, nn) => {
+                if self.v[x] == nn {
                     self.pc += 2
                 }
             }
-            OpCode::CondNEq(X, NN) => {
-                if self.V[X] != NN {
+            OpCode::CondNEq(x, nn) => {
+                if self.v[x] != nn {
                     self.pc += 2
                 }
             }
-            OpCode::CondEqReg(X, Y) => {
-                if self.V[X] == self.V[Y] {
+            OpCode::CondEqReg(x, y) => {
+                if self.v[x] == self.v[y] {
                     self.pc += 2
                 }
             }
-            OpCode::SetReg(X, NN) => {
-                self.V[X] = NN;
+            OpCode::SetReg(x, nn) => {
+                self.v[x] = nn;
             }
-            OpCode::AddToReg(X, NN) => {
-                self.V[X] = u8::wrapping_add(self.V[X], NN);
+            OpCode::AddToReg(x, nn) => {
+                self.v[x] = u8::wrapping_add(self.v[x], nn);
             }
-            OpCode::AssignRegToReg(X, Y) => {
-                self.V[X] = self.V[Y];
+            OpCode::AssignRegToReg(x, y) => {
+                self.v[x] = self.v[y];
             }
-            OpCode::BitwiseOr(X, Y) => {
-                self.V[X] |= self.V[Y]
+            OpCode::BitwiseOr(x, y) => {
+                self.v[x] |= self.v[y]
             }
-            OpCode::BitwiseAnd(X, Y) => {
-                self.V[X] &= self.V[Y];
+            OpCode::BitwiseAnd(x, y) => {
+                self.v[x] &= self.v[y];
             }
-            OpCode::BitwiseXor(X, Y) => {
-                self.V[X] ^= self.V[Y];
+            OpCode::BitwiseXor(x, y) => {
+                self.v[x] ^= self.v[y];
             }
-            OpCode::AddRegToReg(X, Y) => {
-                let (res, carry) = u8::overflowing_add(self.V[X], self.V[Y]);
-                self.V[X] = res;
-                self.V[0xF] = carry as u8; // carry should be 1 when overflow, 0 otherwise
+            OpCode::AddRegToReg(x, y) => {
+                let (res, carry) = u8::overflowing_add(self.v[x], self.v[y]);
+                self.v[x] = res;
+                self.v[0xF] = carry as u8; // carry should be 1 when overflow, 0 otherwise
             }
-            OpCode::SubRegToReg(X, Y) => {
-                let (res, carry) = u8::overflowing_sub(self.V[X], self.V[Y]);
-                self.V[X] = res;
-                self.V[0xF] = (!carry) as u8; // carry should be 0 when overflow, 1 otherwise
+            OpCode::SubRegToReg(x, y) => {
+                let (res, carry) = u8::overflowing_sub(self.v[x], self.v[y]);
+                self.v[x] = res;
+                self.v[0xF] = (!carry) as u8; // carry should be 0 when overflow, 1 otherwise
             }
-            OpCode::StoreLSBWithShift(X) => {
-                self.V[0xF] = self.V[X] & 1;
-                self.V[X] >>= 1;
+            OpCode::StoreLSBWithShift(x) => {
+                self.v[0xF] = self.v[x] & 1;
+                self.v[x] >>= 1;
             }
-            OpCode::SubRegFromReg(X, Y) => {
-                let (res, carry) = u8::overflowing_sub(self.V[Y], self.V[X]);
-                self.V[X] = res;
-                self.V[0xF] = (!carry) as u8; // carry should be 0 when overflow, 1 otherwise
+            OpCode::SubRegFromReg(x, y) => {
+                let (res, carry) = u8::overflowing_sub(self.v[y], self.v[x]);
+                self.v[x] = res;
+                self.v[0xF] = (!carry) as u8; // carry should be 0 when overflow, 1 otherwise
             }
-            OpCode::StoreMSBWithShift(X) => {
-                self.V[0xF] = self.V[X] >> 7;
-                self.V[X] <<= 1;
+            OpCode::StoreMSBWithShift(x) => {
+                self.v[0xF] = self.v[x] >> 7;
+                self.v[x] <<= 1;
             }
-            OpCode::CondNEqReg(X, Y) => {
-                if self.V[X] != self.V[Y] {
+            OpCode::CondNEqReg(x, y) => {
+                if self.v[x] != self.v[y] {
                     self.pc += 2;
                 }
             }
-            OpCode::SetI(NNN) => {
-                self.i = NNN;
+            OpCode::SetI(nnn) => {
+                self.i = nnn;
             }
-            OpCode::JumpToV0Plus(NNN) => {
-                self.pc = self.V[0] as u16 + NNN;
+            OpCode::JumpToV0Plus(nnn) => {
+                self.pc = self.v[0] as u16 + nnn;
             }
-            OpCode::RegRandBitwiseAnd(X, NN) => {
+            OpCode::RegRandBitwiseAnd(x, nn) => {
                 let num: u8 = rand::thread_rng().gen_range(0..255);
-                self.V[X] = num & NN;
+                self.v[x] = num & nn;
             }
-            OpCode::DrawSprite(X, Y, N) => {
-                self.buf_draw_sprite(self.V[X], self.V[Y], N);
+            OpCode::DrawSprite(x, y, n) => {
+                self.buf_draw_sprite(self.v[x], self.v[y], n);
                 self.draw_flag = true;
             }
-            OpCode::IsKeyPressed(X) => {
-                if display.is_key_down(Chip8::kkey_from_code(self.V[X]).unwrap()) {
+            OpCode::IsKeyPressed(x) => {
+                if input_handler.is_key_down(Chip8::kkey_from_code(self.v[x]).unwrap()) {
                     self.pc += 2
                 }
             }
-            OpCode::IsKeyNPressed(X)=> {
-                if display.is_key_up(Chip8::kkey_from_code(self.V[X]).unwrap()) {
+            OpCode::IsKeyNPressed(x)=> {
+                if input_handler.is_key_up(Chip8::kkey_from_code(self.v[x]).unwrap()) {
                     self.pc += 2
                 }
             }
-            OpCode::SetRegToTimer(X) => {
-                self.V[X] = self.delay_timer as u8;
+            OpCode::SetRegToTimer(x) => {
+                self.v[x] = self.delay_timer as u8;
             }
-            OpCode::AwaitKey(X) => {
-                match display.any_key_pressed() {
-                    Some(key_as_hex) => self.V[X] = key_as_hex,
+            OpCode::AwaitKey(x) => {
+                match input_handler.any_key_pressed() {
+                    Some(key_as_hex) => self.v[x] = key_as_hex,
                     None => self.pc -= 2,
                 }
             }
-            OpCode::SetDelayTimer(X) => {
-                self.delay_timer = self.V[X] as u32;
+            OpCode::SetDelayTimer(x) => {
+                self.delay_timer = self.v[x] as u32;
             }
-            OpCode::SetSoundTimer(X) => {
-                self.sound_timer = self.V[X] as u32;
+            OpCode::SetSoundTimer(x) => {
+                self.sound_timer = self.v[x] as u32;
 
             }
-            OpCode::AddRegToI(X) => {
-                self.i += self.V[X] as u16;
+            OpCode::AddRegToI(x) => {
+                self.i += self.v[x] as u16;
             }
-            OpCode::SetIToSprite(X) => {
-                self.i = self.font_location + 5 * ((self.V[X] % 15) as u16); 
+            OpCode::SetIToSprite(x) => {
+                self.i = self.font_location + 5 * ((self.v[x] % 15) as u16); 
             }
-            OpCode::ToDecimal(X) => {
-                self.memory[self.i as usize] = self.V[X] / 100;
-                self.memory[self.i as usize + 1] = (self.V[X] % 100) / 10;
-                self.memory[self.i as usize + 2] = self.V[X] % 10;
+            OpCode::ToDecimal(x) => {
+                self.memory[self.i as usize] = self.v[x] / 100;
+                self.memory[self.i as usize + 1] = (self.v[x] % 100) / 10;
+                self.memory[self.i as usize + 2] = self.v[x] % 10;
             }
-            OpCode::DumpRegs(X) => {
-                for i in 0x0..=X {
-                    self.memory[self.i as usize + i] = self.V[i];
+            OpCode::DumpRegs(x) => {
+                for i in 0x0..=x {
+                    self.memory[self.i as usize + i] = self.v[i];
                 }
             }
-            OpCode::LoadRegs(X) => {
-                for i in 0x0..=X {
-                    self.V[i] = self.memory[self.i as usize + i];
+            OpCode::LoadRegs(x) => {
+                for i in 0x0..=x {
+                    self.v[i] = self.memory[self.i as usize + i];
                 }
             }
         }

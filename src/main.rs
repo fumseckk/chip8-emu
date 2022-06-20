@@ -1,8 +1,10 @@
 mod display;
 mod opcodes;
 mod chip8;
+mod input;
 use display::*;
 use chip8::*;
+use input::*;
 use std::time::Duration;
 use std::thread::sleep;
 use std::env;
@@ -32,15 +34,29 @@ fn main() {
     let mut op_trigger = OP_TRIGGER_VAL;
     let mut timer_trigger = TIMER_TRIGGER_VAL;
     
+    let mut input_handler = InputHandler::new();
+
+    // idée pour l'input:
+    // chaque opcode, on teste pour récupérer un input.
+    // s'il y avait un input en réserve, pas de pb.
+    // s'il n'y en avait pas, alors on commence à decrease un timer d'une durée de 20 opcodes, à part si on tombe sur un nouvel input entre temps, pendant lesquels on va conserver le dernier input récupéré.
+
+
     // Main loop
-    while !display.should_quit() {
+    'main: loop {
 
         if op_trigger == 0 {
             op_trigger = OP_TRIGGER_VAL;
 
+            input_handler.update();
+
+            if input_handler.should_quit() {
+                break 'main;
+            }
+
             // Process opcode
             let opcode = chip8.fetch_opcode().unwrap(); // fetch_opcode().unwrap() panics if invalid operation is read in memory (i.e if None is returned)
-            chip8.execute_opcode(opcode, &display).unwrap_or_else(|err| {
+            chip8.execute_opcode(opcode, &input_handler).unwrap_or_else(|err| {
                 eprintln!("Error executing opcode: {}", err);
                 std::process::exit(1);
             });

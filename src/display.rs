@@ -1,6 +1,6 @@
 use crate::Chip8;
 use termkan;
-use termkan::{rds::Renderer, math::*, img::Color, input::{InputEvent, Input, KeyEvent}};
+use termkan::{rds::Renderer, math::*, img::Color};
 
 
 impl Chip8 {
@@ -12,22 +12,22 @@ impl Chip8 {
         }
     }
 
-    pub fn buf_draw_sprite(&mut self, X: u8, Y: u8, N: u8) {
+    pub fn buf_draw_sprite(&mut self, x: u8, y: u8, n: u8) {
         // should set VF to 1 if something's XOR'd during drawing
         // println!("x={}, y={}, N={}", X, Y, N);
-        self.V[0xF] = 0;
-        let x = X as usize % 64;
-        let y = Y as usize % 32;
+        self.v[0xF] = 0;
+        let x = x as usize % 64;
+        let y = y as usize % 32;
         let mut mask;
 
-        'outer: for k in 0..(N as usize) {
+        'outer: for k in 0..(n as usize) {
             mask = 1 << 7;
             for l in 0..8 {
                 if self.memory[self.i as usize + k as usize] & mask == mask { // si le l-ième bit du row actuel est 1:
                     // println!("On y est!");
                     if self.display_buf[x + l][y + k] == true {
                         // println!("cancel");
-                        self.V[0xF] = 1;
+                        self.v[0xF] = 1;
                         self.display_buf[x + l][y + k] = false;
                     }
                     else {
@@ -74,31 +74,6 @@ impl Display {
                 y: top_left.y + 1
             }
         }
-    }
-
-    // Detects if Ctrl+C is pressed
-    pub fn should_quit(&self) -> bool {
-        let input = Input::get();
-        
-        Some(InputEvent::Key(KeyEvent::Ctrl('c'))) == input.get_event()
-    }
-
-    pub fn is_key_down(&self, key: KeyEvent) -> bool {
-        let input = Input::get();
-        Some(InputEvent::Key(key)) == input.get_event()
-    }
-
-    pub fn is_key_up(&self, key: KeyEvent) -> bool {
-        let input = Input::get();
-        Some(InputEvent::Key(key)) != input.get_event()
-    }
-
-    pub fn any_key_pressed(&self) -> Option<u8> {
-        let input = Input::get();
-        if let Some(InputEvent::Key(key)) = input.get_event() {
-            return Chip8::code_from_kkey(key);
-        }
-        return None;
     }
 
     pub fn draw_point(&self, vec2: Vec2, color: Color) {

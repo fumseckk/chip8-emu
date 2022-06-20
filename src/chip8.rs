@@ -1,4 +1,3 @@
-use crate::Display;
 use std::error::Error;
 
 
@@ -10,7 +9,7 @@ pub struct Chip8 {
     pub stack: Vec<u16>,               // Stack used to call functions/subroutines and return from them
     pub delay_timer: u32,              // decreases at 60Hz
     pub sound_timer: u32,              // beeps when value is 0, decreases at 60Hz
-    pub V: [u8; 16],                   // 16 8-bit registers, from V0 to VF. VF is often used as a flag register.
+    pub v: [u8; 16],                   // 16 8-bit registers, from V0 to VF. VF is often used as a flag register.
     pub font_location: u16,            // Starting point of the stored fonts in memory
     pub draw_flag: bool,                // true if current opcode has changed the display buffer
     pub timers_dec_flag: bool
@@ -28,7 +27,7 @@ impl Chip8 {
             stack: Vec::with_capacity(32),
             delay_timer: 0,
             sound_timer: 0,
-            V: [0; 16],
+            v: [0; 16],
             font_location: 0x200,
             draw_flag: false,
             timers_dec_flag: false,
