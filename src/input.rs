@@ -18,7 +18,6 @@ impl InputHandler {
 
     // Detects if Ctrl+C is pressed
     pub fn should_quit(&self) -> bool {
-        eprintln!("{:?}", self.last_input);
         Some(InputEvent::Key(KeyEvent::Ctrl('c'))) == self.last_input
     }
 
@@ -32,7 +31,7 @@ impl InputHandler {
 
     pub fn any_key_pressed(&self) -> Option<u8> {
         if let Some(InputEvent::Key(key)) = self.last_input {
-        eprintln!("{:?}", self.last_input);
+        eprintln!("{:?}", self.last_input); // TODO faire marcher cet input qui actuellement ne marche pas du tout
             return Chip8::code_from_kkey(key);
         }
         return None;

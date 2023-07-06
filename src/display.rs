@@ -13,8 +13,7 @@ impl Chip8 {
     }
 
     pub fn buf_draw_sprite(&mut self, x: u8, y: u8, n: u8) {
-        // should set VF to 1 if something's XOR'd during drawing
-        // println!("x={}, y={}, N={}", X, Y, N);
+        // sets VF to 1 if something is XOR'd during drawing
         self.v[0xF] = 0;
         let x = x as usize % 64;
         let y = y as usize % 32;
@@ -24,14 +23,11 @@ impl Chip8 {
             mask = 1 << 7;
             for l in 0..8 {
                 if self.memory[self.i as usize + k as usize] & mask == mask { // si le l-ième bit du row actuel est 1:
-                    // println!("On y est!");
                     if self.display_buf[x + l][y + k] == true {
-                        // println!("cancel");
                         self.v[0xF] = 1;
                         self.display_buf[x + l][y + k] = false;
                     }
                     else {
-                        // println!("devient true");
                         self.display_buf[x + l][y + k] = true;
                     }
                 }
